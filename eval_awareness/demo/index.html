@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dataset of Verbalized Eval Awareness</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+:root {
+    --orange: #DB8A48;
+    --tan: #BBAB8B;
+    --gray: #696554;
+    --gold: #F7D67E;
+    --mauve: #B6998B;
+    --bg: #FAF8F5;
+    --card: #FFFFFF;
+    --border: #E8E4DE;
+    --text: #2C2A25;
+    --text-secondary: #8A8578;
+    --text-tertiary: #B0A99C;
+    --highlight: #FEF3C7;
+    --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+.container { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+header { margin-bottom: 32px; }
+header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+.filter-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; align-items: center; }
+.filter-bar select { width: 100%; padding: 7px 28px 7px 11px; font-size: 12px; font-family: inherit; font-weight: 500; border: 1px solid var(--tan); border-radius: 8px; background: var(--card); color: var(--gray); cursor: pointer; outline: none; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23696554' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; transition: all 0.15s; box-shadow: 0 1px 2px rgba(105, 101, 84, 0.05); }
+.filter-bar select:hover { border-color: var(--orange); color: var(--text); }
+.filter-bar select:focus { border-color: var(--orange); }
+.filter-bar select.has-value { background-color: var(--orange); border-color: var(--orange); color: white; box-shadow: 0 1px 3px rgba(219, 138, 72, 0.2); background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='white' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; font-size: 12px; font-weight: 500; border: 1px solid var(--border); border-radius: 20px; background: var(--card); color: var(--text-secondary); cursor: pointer; transition: all 0.15s; user-select: none; }
+.pill:hover { border-color: var(--tan); color: var(--text); }
+.pill.active { background: var(--orange); border-color: var(--orange); color: white; }
+.pill .count { font-size: 11px; opacity: 0.7; }
+.search-bar { position: relative; margin-bottom: 24px; }
+.search-bar input { width: 100%; padding: 12px 16px 12px 40px; font-size: 14px; font-family: inherit; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: var(--text); outline: none; transition: border-color 0.15s; }
+.search-bar input:focus { border-color: var(--orange); }
+.search-bar input::placeholder { color: var(--text-tertiary); }
+.search-bar svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-tertiary); }
+.results-info { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+.quote-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 10px; cursor: pointer; transition: all 0.15s; }
+.quote-card:hover { border-color: var(--tan); box-shadow: 0 2px 8px rgba(105, 101, 84, 0.08); }
+.quote-card .quote-text { font-size: 14px; line-height: 1.7; color: var(--text); }
+.quote-card .meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.badge { display: inline-flex; align-items: center; padding: 3px 8px; font-size: 11px; font-weight: 500; border-radius: 4px; }
+.badge { background: #F0EDE8; color: var(--gray); border: 1px solid var(--border); }
+mark { background: var(--gold); color: var(--text); font-weight: 600; padding: 1px 2px; border-radius: 2px; }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(44, 42, 37, 0.5); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 24px; }
+.modal-overlay.open { display: flex; }
+.modal-loading { display: flex; align-items: center; justify-content: center; padding: 48px; color: var(--text-secondary); font-size: 14px; gap: 8px; }
+.spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--orange); border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.modal-box { background: #F0EDE8; border-radius: 14px; width: 960px; max-width: 100%; max-height: 88vh; overflow-y: auto; box-shadow: 0 24px 48px rgba(44, 42, 37, 0.15); }
+.modal-header { position: sticky; top: 0; background: var(--card); padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; z-index: 1; border-radius: 14px 14px 0 0; }
+.modal-header h2 { font-size: 16px; font-weight: 600; }
+.modal-header .sub { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.modal-header .sub a { color: var(--orange); cursor: pointer; text-decoration: none; }
+.modal-header .sub a:hover { text-decoration: underline; }
+.modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-tertiary); padding: 4px; line-height: 1; }
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+.msg-row { display: flex; }
+.msg-row.msg-user { justify-content: flex-start; }
+.msg-row.msg-assistant { justify-content: flex-end; }
+.msg-row.msg-reasoning { justify-content: flex-end; }
+.msg-bubble { max-width: 75%; padding: 12px 16px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-wrap: break-word; border-radius: 16px; background: var(--card); color: var(--text); }
+.msg-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; color: var(--text); }
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Dataset of Verbalized Eval Awareness</h1>
+    </header>
+
+    <div class="filter-bar" id="filter-bar">
+        <select id="filter-category"><option value="">All Categories</option></select>
+        <select id="filter-benchmark"><option value="">All Benchmarks</option></select>
+        <select id="filter-model"><option value="">All Models</option></select>
+        <select id="filter-source"><option value="">All Sources</option></select>
+        <select id="filter-subcategory" style="display:none;"><option value="">All Subcategories</option></select>
+    </div>
+
+    <div class="search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="search-input" placeholder="Search quotes...">
+    </div>
+
+    <div class="results-info"><span id="results-info"></span><span style="color:var(--text-tertiary);">Click on any instance to view the full transcript.</span></div>
+    <div id="quotes-container"></div>
+</div>
+
+<div class="modal-overlay" id="modal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <div>
+                <h2 id="modal-title"></h2>
+                <div class="sub" id="modal-sub"></div>
+            </div>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+    </div>
+</div>
+
+<script>
+let allQuotes = [];
+let categories = new Set();
+let assignments = {};
+let evaluatedOgData = [];
+let selectedMainCategory = null;
+let selectedCategory = null;
+let selectedModel = null;
+let selectedBenchmark = null;
+let selectedSource = null;
+let searchTerm = '';
+
+const MODEL_NAMES = {
+    'anthropic/claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5',
+    'openrouter/google/gemini-3-pro-preview': 'Gemini 3 Pro',
+    'openai/gpt-5': 'GPT 5',
+    'openai/o3': 'o3',
+    'openrouter/allenai/olmo-3-32b-think': 'OLMo 3 32B Think',
+    'openrouter/moonshotai/kimi-k2-thinking': 'Kimi K2 Thinking',
+    'openrouter/openai/gpt-oss-120b': 'GPT OSS 120B',
+    'openrouter/qwen/qwen3-32b': 'Qwen 3 32B',
+};
+
+const BENCH_NAMES = {
+    'bbq': 'BBQ', 'wmdp_bio': 'WMDP Bio', 'wmdp_chem': 'WMDP Chem', 'wmdp_cyber': 'WMDP Cyber',
+    'agentic_misalignment': 'Agentic Misalignment', 'sycophancy': 'Sycophancy',
+    'stereoset': 'Stereoset', 'abstention_bench': 'Abstention Bench',
+    'sosbench': 'SOSBench', 'fortress_adversarial': 'Fortress',
+    'air_bench': 'AIR Bench', 'bold': 'BOLD', 'threecb': '3CB', 'xstest': 'XSTest',
+};
+
+function fmtModel(m) { return MODEL_NAMES[m] || m.split('/').pop(); }
+function fmtBench(b) {
+    if (BENCH_NAMES[b]) return BENCH_NAMES[b];
+    if (b.startsWith('gdm_')) return 'GDM: ' + b.replace('gdm_','').replace(/_/g,' ');
+    return b.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function getFiltered() {
+    let f = allQuotes;
+    if (selectedCategory) f = f.filter(q => assignments[q.index] === selectedCategory);
+    else if (selectedMainCategory) f = f.filter(q => assignments[q.index] && assignments[q.index].startsWith(selectedMainCategory));
+    if (selectedModel) f = f.filter(q => q.model === selectedModel);
+    if (selectedBenchmark) f = f.filter(q => q.benchmark === selectedBenchmark);
+    if (selectedSource) {
+        if (selectedSource === 'cot') f = f.filter(q => q.source === 'cot' && !q.also_in_response);
+        else if (selectedSource === 'response') f = f.filter(q => q.source === 'response');
+        else if (selectedSource === 'both') f = f.filter(q => q.also_in_response);
+    }
+    if (searchTerm.trim()) {
+        const s = searchTerm.toLowerCase();
+        f = f.filter(q => q.quote.toLowerCase().includes(s));
+    }
+    return f;
+}
+
+function render() {
+    const filtered = getFiltered();
+    document.getElementById('results-info').textContent = `Showing ${filtered.length} of ${allQuotes.length} instances`;
+    const container = document.getElementById('quotes-container');
+    container.innerHTML = '';
+    function seededRandom(seed) { let s = seed; return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; }; }
+    const rng = seededRandom(42);
+    const shuffled = [...filtered].map(q => [rng(), q]).sort((a,b) => a[0] - b[0]).map(x => x[1]);
+    shuffled.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'quote-card';
+        div.onclick = () => openModal(item.index);
+        const text = searchTerm.trim() ? highlightSearch(item.quote, searchTerm) : formatQuote(escapeHtml(item.quote));
+        const cat = assignments[item.index];
+        div.innerHTML = `
+            <div class="quote-text">${text}</div>
+            <div class="meta">
+                <span class="badge">${fmtModel(item.model)}</span>
+                <span class="badge">${fmtBench(item.benchmark)}</span>
+                ${cat ? `<span class="badge">${cat.replace('/', ' / ')}</span>` : ''}
+            </div>`;
+        container.appendChild(div);
+    });
+}
+
+function populateDropdowns() {
+    const modelSel = document.getElementById('filter-model');
+    const benchSel = document.getElementById('filter-benchmark');
+    const catSel = document.getElementById('filter-category');
+    const srcSel = document.getElementById('filter-source');
+
+    const modelCounts = {};
+    allQuotes.forEach(q => { modelCounts[q.model] = (modelCounts[q.model]||0)+1; });
+    Object.entries(modelCounts).sort((a,b)=>b[1]-a[1]).forEach(([m,c]) => {
+        const opt = document.createElement('option');
+        opt.value = m; opt.textContent = `${fmtModel(m)} (${c})`;
+        modelSel.appendChild(opt);
+    });
+
+    const benchCounts = {};
+    allQuotes.forEach(q => { benchCounts[q.benchmark] = (benchCounts[q.benchmark]||0)+1; });
+    Object.entries(benchCounts).sort((a,b)=>fmtBench(a[0]).localeCompare(fmtBench(b[0]))).forEach(([b,c]) => {
+        const opt = document.createElement('option');
+        opt.value = b; opt.textContent = `${fmtBench(b)} (${c})`;
+        benchSel.appendChild(opt);
+    });
+
+    const mainCats = {};
+    Array.from(categories).forEach(cat => {
+        const main = cat.split('/')[0];
+        if (!mainCats[main]) mainCats[main] = [];
+        if (cat.includes('/')) mainCats[main].push(cat);
+    });
+    const mainCounts = {};
+    Object.keys(mainCats).forEach(main => {
+        mainCounts[main] = Object.values(assignments).filter(c => c && c.startsWith(main)).length;
+    });
+    Object.keys(mainCats).sort((a,b)=>mainCounts[b]-mainCounts[a]).forEach(main => {
+        const opt = document.createElement('option');
+        opt.value = main;
+        opt.textContent = `${main} (${mainCounts[main]})`;
+        catSel.appendChild(opt);
+    });
+
+    srcSel.innerHTML = '<option value="">All Sources</option>';
+    const srcCounts = { cot: 0, response: 0, both: 0 };
+    allQuotes.forEach(q => {
+        if (q.also_in_response) srcCounts.both++;
+        else if (q.source === 'response') srcCounts.response++;
+        else srcCounts.cot++;
+    });
+    [['cot','CoT'],['response','Response'],['both','CoT + Response']].forEach(([k,l]) => {
+        if (srcCounts[k] === 0) return;
+        const opt = document.createElement('option');
+        opt.value = k; opt.textContent = `${l} (${srcCounts[k]})`;
+        srcSel.appendChild(opt);
+    });
+
+    function toggleClass(el) { el.classList.toggle('has-value', el.value !== ''); }
+
+    modelSel.addEventListener('change', () => { selectedModel = modelSel.value || null; toggleClass(modelSel); render(); });
+    benchSel.addEventListener('change', () => { selectedBenchmark = benchSel.value || null; toggleClass(benchSel); render(); });
+    catSel.addEventListener('change', () => {
+        selectedMainCategory = catSel.value || null;
+        selectedCategory = null;
+        toggleClass(catSel);
+        updateSubcategoryDropdown();
+        render();
+    });
+    srcSel.addEventListener('change', () => { selectedSource = srcSel.value || null; toggleClass(srcSel); render(); });
+
+    document.getElementById('filter-subcategory').addEventListener('change', function() {
+        selectedCategory = this.value || null;
+        this.classList.toggle('has-value', this.value !== '');
+        render();
+    });
+
+    document.getElementById('filter-subcategory').style.display = 'none';
+}
+
+function updateSubcategoryDropdown() {
+    const subSel = document.getElementById('filter-subcategory');
+    if (!selectedMainCategory) { subSel.style.display = 'none'; return; }
+    // Only show subcategories for Testing
+    const subcats = Array.from(categories).filter(c => c.startsWith(selectedMainCategory + '/'));
+    if (subcats.length === 0 || selectedMainCategory !== 'Testing') { subSel.style.display = 'none'; return; }
+    subSel.style.display = 'block';
+    subSel.innerHTML = `<option value="">All ${selectedMainCategory}</option>`;
+    const counts = {};
+    subcats.forEach(sc => { counts[sc] = Object.values(assignments).filter(c => c === sc).length; });
+    subcats.sort((a,b) => counts[b] - counts[a]).forEach(sc => {
+        const opt = document.createElement('option');
+        opt.value = sc; opt.textContent = `${sc.split('/')[1]} (${counts[sc]})`;
+        subSel.appendChild(opt);
+    });
+}
+
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function formatQuote(s) { return s.replace(/ (\d+)\. /g, '<br>$1. ').replace(/ - /g, '<br>- '); }
+
+function highlightSearch(text, term) {
+    const escaped = escapeHtml(text);
+    const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return escaped.replace(regex, '<mark>$1</mark>');
+}
+
+async function openModal(quoteIndex) {
+    const quote = allQuotes.find(q => q.index === quoteIndex);
+    if (!quote) return;
+    if (evaluatedOgData.length === 0) {
+        try { evaluatedOgData = await (await fetch('evaluated_og_filtered.json')).json(); } catch(e) { return; }
+    }
+    const match = evaluatedOgData.find(e => (e.quote||'').replace(/"/g,'') === quote.quote);
+    if (!match || !match.source_file) { alert('No transcript available for this instance.'); return; }
+    const modal = document.getElementById('modal');
+    document.getElementById('modal-title').textContent = 'Loading...';
+    document.getElementById('modal-sub').innerHTML = '';
+    document.getElementById('modal-body').innerHTML = '<div class="modal-loading"><div class="spinner"></div>Loading transcript</div>';
+    modal.classList.add('open');
+    try {
+        const file = match.source_file + '.json';
+        const transcripts = await (await fetch(`clean_transcripts/${file}`)).json();
+        const conv = Array.isArray(transcripts) ? transcripts[match.question_id] : (transcripts[match.question_id] || transcripts[String(match.question_id)]);
+        if (!conv) { alert('Conversation not found in transcript.'); return; }
+        document.getElementById('modal-title').textContent = `${fmtModel(conv.model)} \u2014 ${fmtBench(conv.benchmark)}`;
+        const base = file.replace('.json','');
+        document.getElementById('modal-sub').innerHTML =
+            `<a onclick="downloadFile('clean_transcripts/${file}','${file}')">Download transcript</a>`;
+        // Find which turn contains the quote to show around it
+        const MAX_INITIAL = 5;
+        const turns = conv.transcript;
+        let quoteTurnIdx = -1;
+        for (let ti = 0; ti < turns.length; ti++) {
+            const t = turns[ti];
+            const check = ((t.reasoning || '') + ' ' + (t.content || '')).replace(QRE, '');
+            const qCheck = quote.quote.replace(QRE, '').substring(0, 30);
+            if (check.includes(qCheck)) { quoteTurnIdx = ti; break; }
+        }
+        // Show turns around the quote turn, capped at MAX_INITIAL
+        let startIdx = 0, endIdx = turns.length;
+        if (turns.length > MAX_INITIAL) {
+            if (quoteTurnIdx >= 0) {
+                startIdx = Math.max(0, quoteTurnIdx - Math.floor(MAX_INITIAL / 2));
+                endIdx = Math.min(turns.length, startIdx + MAX_INITIAL);
+                if (endIdx === turns.length) startIdx = Math.max(0, endIdx - MAX_INITIAL);
+            } else {
+                endIdx = MAX_INITIAL;
+            }
+        }
+        window._modalConv = { turns, quote: quote.quote, startIdx, endIdx };
+        function renderTurns(start, end, q) {
+            let html = '';
+            if (start > 0) html += `<div style="text-align:center;margin:8px 0;"><button onclick="loadMoreTurns('before')" style="border:1px solid var(--border);background:var(--card);border-radius:8px;padding:6px 16px;font-size:12px;cursor:pointer;color:var(--text-secondary);font-family:inherit;">Load ${start} earlier turn${start>1?'s':''}</button></div>`;
+            for (let i = start; i < end; i++) {
+                const turn = turns[i];
+                if (turn.role === 'assistant' && turn.reasoning) {
+                    html += `<div class="msg-row msg-reasoning"><div class="msg-bubble"><div class="msg-label">Reasoning</div>${highlightQuote(turn.reasoning, q)}</div></div>`;
+                }
+                if (turn.role === 'assistant' && !(turn.content||'').trim()) continue;
+                const cls = turn.role === 'user' ? 'msg-user' : 'msg-assistant';
+                const label = turn.role === 'user' ? 'User' : 'Final Response';
+                html += `<div class="msg-row ${cls}"><div class="msg-bubble"><div class="msg-label">${label}</div>${highlightQuote(turn.content||'', q)}</div></div>`;
+            }
+            if (end < turns.length) html += `<div style="text-align:center;margin:8px 0;"><button onclick="loadMoreTurns('after')" style="border:1px solid var(--border);background:var(--card);border-radius:8px;padding:6px 16px;font-size:12px;cursor:pointer;color:var(--text-secondary);font-family:inherit;">Load ${turns.length - end} later turn${turns.length-end>1?'s':''}</button></div>`;
+            return html;
+        }
+        document.getElementById('modal-body').innerHTML = renderTurns(startIdx, endIdx, quote.quote);
+        window._renderTurns = renderTurns;
+        requestAnimationFrame(() => {
+            const highlighted = document.querySelector('#modal-body mark');
+            if (highlighted) highlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    } catch(e) { alert('Error loading transcript: ' + e.message); }
+}
+
+const QRE = /['\u2018\u2019\u2032`"\u201C\u201D\u2033]/g;
+function highlightQuote(text, quote) {
+    if (!quote || !text) return escapeHtml(text);
+    const cleaned = text.replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1').replace(/^#{1,4}\s+/gm, '');
+    const escaped = escapeHtml(cleaned);
+    // Build map: stripped index -> original index
+    const map = []; // map[stripped_idx] = original_idx
+    for (let i = 0; i < escaped.length; i++) {
+        if (!escaped[i].match(QRE)) map.push(i);
+    }
+    const stripped = escaped.replace(QRE, '');
+    const chunks = quote.split(/\s+and\s+|\.{3}|\s{2,}/).map(c => c.trim()).filter(c => c.length >= 12);
+    const toMatch = chunks.length > 0 ? chunks : [quote];
+    const marks = new Uint8Array(escaped.length);
+    for (const chunk of toMatch) {
+        const pat = escapeHtml(chunk).replace(QRE, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+        try {
+            const m = stripped.match(new RegExp(pat, 'i'));
+            if (m) {
+                for (let si = m.index; si < m.index + m[0].length; si++) {
+                    if (si < map.length) marks[map[si]] = 1;
+                }
+                // Also mark any quote chars between marked ranges
+                for (let i = 1; i < escaped.length - 1; i++) {
+                    if (!marks[i] && escaped[i].match(QRE) && marks[i-1] && marks[i+1]) marks[i] = 1;
+                }
+            }
+        } catch(e) {}
+    }
+    let result = '', inMark = false;
+    for (let i = 0; i < escaped.length; i++) {
+        if (marks[i] && !inMark) { result += '<mark>'; inMark = true; }
+        if (!marks[i] && inMark) { result += '</mark>'; inMark = false; }
+        result += escaped[i];
+    }
+    if (inMark) result += '</mark>';
+    return result;
+}
+
+function loadMoreTurns(dir) {
+    const c = window._modalConv;
+    if (dir === 'before') c.startIdx = Math.max(0, c.startIdx - 5);
+    else c.endIdx = Math.min(c.turns.length, c.endIdx + 5);
+    document.getElementById('modal-body').innerHTML = window._renderTurns(c.startIdx, c.endIdx, c.quote);
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+async function downloadFile(url, name) {
+    try {
+        const blob = await (await fetch(url)).blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch(e) {}
+}
+
+document.getElementById('search-input').addEventListener('input', e => { searchTerm = e.target.value; render(); });
+document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+async function init() {
+    try {
+        const [evalRes, catRes] = await Promise.all([fetch('evaluated.json'), fetch('categories.json')]);
+        const evalData = await evalRes.json();
+        const catData = await catRes.json();
+        allQuotes = evalData.filter(item => item.quote).map((item, i) => ({
+            index: i,
+            quote: item.quote.replace(/"/g, ''),
+            model: item.model,
+            benchmark: item.benchmark,
+            score: item.score,
+            source: item.source || 'cot',
+            also_in_response: item.also_in_response || false,
+            originalIndex: item.idx
+        }));
+        if (catData.categories) categories = new Set(catData.categories);
+        if (catData.assignments) assignments = catData.assignments;
+        populateDropdowns();
+        render();
+    } catch(e) { console.error('Init error:', e); }
+}
+
+init();
+</script>
+</body>
+</html>

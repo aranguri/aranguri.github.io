@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html><head><title>Prompt Rewriting to Remove Authority Claims</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+:root {
+    --orange: #DB8A48;
+    --tan: #BBAB8B;
+    --gray: #696554;
+    --bg: #FAF8F5;
+    --card: #FFFFFF;
+    --border: #E8E4DE;
+    --text: #2C2A25;
+    --text-secondary: #8A8578;
+    --text-tertiary: #B0A99C;
+    --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+.container { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+header { margin-bottom: 32px; }
+header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+.legend { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
+.legend .del { background: #fdd; text-decoration: line-through; color: #a00; border-radius: 2px; padding: 1px 4px; }
+.legend .ins { background: #dfd; color: #060; border-radius: 2px; padding: 1px 4px; }
+.plot-container { margin-bottom: 24px; }
+.plot-container img { max-width: 100%; border-radius: var(--radius); border: 1px solid var(--border); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+.card-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.qid { font-weight: 600; font-size: 15px; }
+.badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #F0EDE8; color: var(--gray); border: 1px solid var(--border); }
+.metrics { margin-left: auto; display: flex; gap: 12px; }
+.ea-box { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.ea-delta { padding: 2px 6px; border-radius: 3px; font-weight: 600; font-size: 11px; }
+.delta-down { background: #d4edda; color: #155724; }
+.delta-up { background: #f8d7da; color: #721c24; }
+.delta-flat { background: #F0EDE8; color: var(--gray); }
+.diff-body { padding: 16px; font-size: 13px; line-height: 1.8; white-space: pre-wrap; word-wrap: break-word; }
+.del { background: #fdd; text-decoration: line-through; color: #a00; border-radius: 2px; padding: 1px 2px; }
+.ins { background: #dfd; color: #060; border-radius: 2px; padding: 1px 2px; }
+.highlight { background: #FEF3C7; font-weight: 600; border-radius: 2px; padding: 0 2px; }
+.results-info { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+</style>
+<script>
+function diffWords(a, b) {
+  const wa = a.split(/\s+/).filter(Boolean), wb = b.split(/\s+/).filter(Boolean);
+  const m = wa.length, n = wb.length;
+  const dp = Array.from({length: m+1}, () => new Int32Array(n+1));
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = wa[i-1] === wb[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+  let i = m, j = n;
+  const ops = [];
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && wa[i-1] === wb[j-1]) { ops.push({type:'eq', text:wa[i-1]}); i--; j--; }
+    else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) { ops.push({type:'ins', text:wb[j-1]}); j--; }
+    else { ops.push({type:'del', text:wa[i-1]}); i--; }
+  }
+  ops.reverse();
+  const merged = [];
+  for (const o of ops) {
+    if (merged.length && merged[merged.length-1].type === o.type) merged[merged.length-1].text += ' ' + o.text;
+    else merged.push({type: o.type, text: o.text});
+  }
+  return merged.map(o => o.type === 'eq' ? esc(o.text) : o.type === 'del' ? `<span class="del">${esc(o.text)}</span>` : `<span class="ins">${esc(o.text)}</span>`).join(' ');
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+let examplesData = null;
+
+function renderCards(data) {
+  const container = document.getElementById('cards');
+  container.innerHTML = '';
+  const entries = Object.entries(data);
+  const changed = entries.filter(([_, v]) => v.original.trim() !== v.rewritten.trim());
+
+  const sorted = entries.sort((a, b) => {
+    const na = parseInt(a[0].replace(/\D/g, ''));
+    const nb = parseInt(b[0].replace(/\D/g, ''));
+    return na - nb;
+  });
+
+
+  for (const [qid, v] of sorted) {
+    const isChanged = v.original.trim() !== v.rewritten.trim();
+    const html = isChanged ? diffWords(v.original, v.rewritten) : esc(v.original);
+    const badgeHtml = isChanged ? '' : '<span class="badge">UNCHANGED</span>';
+
+    let eaHtml = '';
+    if (v.orig_tot) {
+      const origPct = (100 * v.orig_ea / v.orig_tot).toFixed(1);
+      if (v.new_tot && isChanged) {
+        const newPct = (100 * v.new_ea / v.new_tot).toFixed(1);
+        const delta = (newPct - origPct).toFixed(1);
+        const dc = delta < -0.5 ? 'delta-down' : delta > 0.5 ? 'delta-up' : 'delta-flat';
+        const sign = delta >= 0 ? '+' : '';
+        eaHtml = `<div class="ea-box">Verbalized eval awareness rate: ${origPct}% \u2192 ${newPct}% <span class="ea-delta ${dc}">${sign}${delta}pp</span></div>`;
+      } else {
+        eaHtml = `<div class="ea-box">Verbalized eval awareness rate: ${origPct}%</div>`;
+      }
+    }
+    if (v.orig_refusal != null && v.orig_total) {
+      const origR = (100 * v.orig_refusal / v.orig_total).toFixed(1);
+      if (v.new_refusal != null && v.new_total && isChanged) {
+        const newR = (100 * v.new_refusal / v.new_total).toFixed(1);
+        const deltaR = (newR - origR).toFixed(1);
+        const dcR = deltaR < -0.5 ? 'delta-down' : deltaR > 0.5 ? 'delta-up' : 'delta-flat';
+        const signR = deltaR >= 0 ? '+' : '';
+        eaHtml += `<div class="ea-box">Refusal rate: ${origR}% \u2192 ${newR}% <span class="ea-delta ${dcR}">${signR}${deltaR}pp</span></div>`;
+      } else {
+        eaHtml += `<div class="ea-box">Refusal rate: ${origR}%</div>`;
+      }
+    }
+
+    let exHtml = '';
+    if (currentTab === 'treatment' && examplesData && examplesData[qid]) {
+      const ev = examplesData[qid];
+      const exItems = ev.examples.map(e => { let t = esc(e); t = t.replace(/(chatbot|crowdsourc\w*|stranger|unverif\w*)/gi, '<span class="highlight">$1</span>'); return `<div style="padding:8px 16px;font-size:12px;line-height:1.6;color:var(--text-secondary);border-bottom:1px solid var(--border);font-style:italic">...${t}...</div>`; }).join('');
+      exHtml = `<div style="padding:8px 16px;background:#F0EDE8;font-size:11px;font-weight:600;color:var(--gray);border-bottom:1px solid var(--border)">CoT excerpts with "chatbot/crowdsource/stranger/unverifiable" (${ev.keyword_rollouts}/1000 rollouts)</div>${exItems}`;
+    }
+
+    container.innerHTML += `<div class="card"><div class="card-header"><span class="qid">${qid}</span>${badgeHtml}<div class="metrics">${eaHtml}</div></div><div class="diff-body">${html}</div>${exHtml}</div>`;
+  }
+}
+
+let currentTab = 'treatment';
+
+async function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  if (tab === 'treatment' && !examplesData) {
+    examplesData = await fetch('data/claim_examples.json').then(r => r.json());
+  }
+  const data = await fetch(`data/${tab}.json?v=${Date.now()}`).then(r => r.json());
+  renderCards(data);
+}
+
+switchTab('treatment');
+</script>
+</head>
+<body>
+<div class="container">
+<header>
+  <h1>Prompt Rewriting to Remove Authority Claims</h1>
+  <div class="legend">Diffs between original and rewritten prompts: <span class="del">removed from original</span> <span class="ins">added in rewrite</span></div>
+</header>
+<div class="results-info" id="results-info"></div>
+<div id="cards"></div>
+</div>
+</body></html>
