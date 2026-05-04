@@ -52,9 +52,6 @@ mark { background: var(--gold); color: var(--text); font-weight: 600; padding: 1
 /* Modal */
 .modal-overlay { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(44, 42, 37, 0.5); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 24px; }
 .modal-overlay.open { display: flex; }
-.modal-loading { display: flex; align-items: center; justify-content: center; padding: 48px; color: var(--text-secondary); font-size: 14px; gap: 8px; }
-.spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--orange); border-radius: 50%; animation: spin 0.6s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
 .modal-box { background: #F0EDE8; border-radius: 14px; width: 960px; max-width: 100%; max-height: 88vh; overflow-y: auto; box-shadow: 0 24px 48px rgba(44, 42, 37, 0.15); }
 .modal-header { position: sticky; top: 0; background: var(--card); padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; z-index: 1; border-radius: 14px 14px 0 0; }
 .modal-header h2 { font-size: 16px; font-weight: 600; }
@@ -67,8 +64,7 @@ mark { background: var(--gold); color: var(--text); font-weight: 600; padding: 1
 .msg-row { display: flex; }
 .msg-row.msg-user { justify-content: flex-start; }
 .msg-row.msg-assistant { justify-content: flex-end; }
-.msg-row.msg-reasoning { justify-content: flex-end; }
-.msg-bubble { max-width: 75%; padding: 12px 16px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-wrap: break-word; border-radius: 16px; background: var(--card); color: var(--text); }
+.msg-bubble { padding: 12px 16px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-wrap: break-word; border-radius: 16px; background: var(--card); color: var(--text); }
 .msg-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; color: var(--text); }
 </style>
 </head>
@@ -91,7 +87,7 @@ mark { background: var(--gold); color: var(--text); font-weight: 600; padding: 1
         <input type="text" id="search-input" placeholder="Search quotes...">
     </div>
 
-    <div class="results-info"><span id="results-info"></span><span style="color:var(--text-tertiary);">Click on any instance to view the full transcript.</span></div>
+    <div class="results-info"><span id="results-info"></span><span style="color:var(--text-tertiary);">Click on any instance to view the prompt.</span></div>
     <div id="quotes-container"></div>
 </div>
 
@@ -112,7 +108,7 @@ mark { background: var(--gold); color: var(--text); font-weight: 600; padding: 1
 let allQuotes = [];
 let categories = new Set();
 let assignments = {};
-let evaluatedOgData = [];
+let promptsMap = {};
 let selectedMainCategory = null;
 let selectedCategory = null;
 let selectedModel = null;
@@ -293,129 +289,31 @@ function highlightSearch(text, term) {
 async function openModal(quoteIndex) {
     const quote = allQuotes.find(q => q.index === quoteIndex);
     if (!quote) return;
-    if (evaluatedOgData.length === 0) {
-        try { evaluatedOgData = await (await fetch('evaluated_og_filtered.json')).json(); } catch(e) { return; }
+    if (!Object.keys(promptsMap).length) {
+        promptsMap = await (await fetch('prompts.json')).json();
     }
-    const match = evaluatedOgData.find(e => (e.quote||'').replace(/"/g,'') === quote.quote);
-    if (!match || !match.source_file) { alert('No transcript available for this instance.'); return; }
+    const turns = promptsMap[String(quoteIndex)];
+    if (!turns) { alert('No prompt available for this instance.'); return; }
     const modal = document.getElementById('modal');
-    document.getElementById('modal-title').textContent = 'Loading...';
+    document.getElementById('modal-title').textContent = `${fmtModel(quote.model)} \u2014 ${fmtBench(quote.benchmark)}`;
     document.getElementById('modal-sub').innerHTML = '';
-    document.getElementById('modal-body').innerHTML = '<div class="modal-loading"><div class="spinner"></div>Loading transcript</div>';
+    let displayTurns = turns;
+    while (displayTurns.length > 0 && displayTurns[displayTurns.length - 1].role === 'assistant') {
+        displayTurns = displayTurns.slice(0, -1);
+    }
+    let html = '';
+    for (const t of displayTurns) {
+        if (t.role === 'assistant') {
+            html += '<div class="msg-row msg-assistant"><div class="msg-bubble" style="color:var(--text-tertiary);font-style:italic;"><div class="msg-label">Assistant</div>Model response (omitted)</div></div>';
+        } else {
+            html += '<div class="msg-row msg-user"><div class="msg-bubble"><div class="msg-label">User</div>' + escapeHtml(t.content || '') + '</div></div>';
+        }
+    }
+    document.getElementById('modal-body').innerHTML = html;
     modal.classList.add('open');
-    try {
-        const file = match.source_file + '.json';
-        const transcripts = await (await fetch(`clean_transcripts/${file}`)).json();
-        const conv = Array.isArray(transcripts) ? transcripts[match.question_id] : (transcripts[match.question_id] || transcripts[String(match.question_id)]);
-        if (!conv) { alert('Conversation not found in transcript.'); return; }
-        document.getElementById('modal-title').textContent = `${fmtModel(conv.model)} \u2014 ${fmtBench(conv.benchmark)}`;
-        const base = file.replace('.json','');
-        document.getElementById('modal-sub').innerHTML =
-            `<a onclick="downloadFile('clean_transcripts/${file}','${file}')">Download transcript</a>`;
-        // Find which turn contains the quote to show around it
-        const MAX_INITIAL = 5;
-        const turns = conv.transcript;
-        let quoteTurnIdx = -1;
-        for (let ti = 0; ti < turns.length; ti++) {
-            const t = turns[ti];
-            const check = ((t.reasoning || '') + ' ' + (t.content || '')).replace(QRE, '');
-            const qCheck = quote.quote.replace(QRE, '').substring(0, 30);
-            if (check.includes(qCheck)) { quoteTurnIdx = ti; break; }
-        }
-        // Show turns around the quote turn, capped at MAX_INITIAL
-        let startIdx = 0, endIdx = turns.length;
-        if (turns.length > MAX_INITIAL) {
-            if (quoteTurnIdx >= 0) {
-                startIdx = Math.max(0, quoteTurnIdx - Math.floor(MAX_INITIAL / 2));
-                endIdx = Math.min(turns.length, startIdx + MAX_INITIAL);
-                if (endIdx === turns.length) startIdx = Math.max(0, endIdx - MAX_INITIAL);
-            } else {
-                endIdx = MAX_INITIAL;
-            }
-        }
-        window._modalConv = { turns, quote: quote.quote, startIdx, endIdx };
-        function renderTurns(start, end, q) {
-            let html = '';
-            if (start > 0) html += `<div style="text-align:center;margin:8px 0;"><button onclick="loadMoreTurns('before')" style="border:1px solid var(--border);background:var(--card);border-radius:8px;padding:6px 16px;font-size:12px;cursor:pointer;color:var(--text-secondary);font-family:inherit;">Load ${start} earlier turn${start>1?'s':''}</button></div>`;
-            for (let i = start; i < end; i++) {
-                const turn = turns[i];
-                if (turn.role === 'assistant' && turn.reasoning) {
-                    html += `<div class="msg-row msg-reasoning"><div class="msg-bubble"><div class="msg-label">Reasoning</div>${highlightQuote(turn.reasoning, q)}</div></div>`;
-                }
-                if (turn.role === 'assistant' && !(turn.content||'').trim()) continue;
-                const cls = turn.role === 'user' ? 'msg-user' : 'msg-assistant';
-                const label = turn.role === 'user' ? 'User' : 'Final Response';
-                html += `<div class="msg-row ${cls}"><div class="msg-bubble"><div class="msg-label">${label}</div>${highlightQuote(turn.content||'', q)}</div></div>`;
-            }
-            if (end < turns.length) html += `<div style="text-align:center;margin:8px 0;"><button onclick="loadMoreTurns('after')" style="border:1px solid var(--border);background:var(--card);border-radius:8px;padding:6px 16px;font-size:12px;cursor:pointer;color:var(--text-secondary);font-family:inherit;">Load ${turns.length - end} later turn${turns.length-end>1?'s':''}</button></div>`;
-            return html;
-        }
-        document.getElementById('modal-body').innerHTML = renderTurns(startIdx, endIdx, quote.quote);
-        window._renderTurns = renderTurns;
-        requestAnimationFrame(() => {
-            const highlighted = document.querySelector('#modal-body mark');
-            if (highlighted) highlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
-    } catch(e) { alert('Error loading transcript: ' + e.message); }
 }
 
-const QRE = /['\u2018\u2019\u2032`"\u201C\u201D\u2033]/g;
-function highlightQuote(text, quote) {
-    if (!quote || !text) return escapeHtml(text);
-    const cleaned = text.replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1').replace(/^#{1,4}\s+/gm, '');
-    const escaped = escapeHtml(cleaned);
-    // Build map: stripped index -> original index
-    const map = []; // map[stripped_idx] = original_idx
-    for (let i = 0; i < escaped.length; i++) {
-        if (!escaped[i].match(QRE)) map.push(i);
-    }
-    const stripped = escaped.replace(QRE, '');
-    const chunks = quote.split(/\s+and\s+|\.{3}|\s{2,}/).map(c => c.trim()).filter(c => c.length >= 12);
-    const toMatch = chunks.length > 0 ? chunks : [quote];
-    const marks = new Uint8Array(escaped.length);
-    for (const chunk of toMatch) {
-        const pat = escapeHtml(chunk).replace(QRE, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-        try {
-            const m = stripped.match(new RegExp(pat, 'i'));
-            if (m) {
-                for (let si = m.index; si < m.index + m[0].length; si++) {
-                    if (si < map.length) marks[map[si]] = 1;
-                }
-                // Also mark any quote chars between marked ranges
-                for (let i = 1; i < escaped.length - 1; i++) {
-                    if (!marks[i] && escaped[i].match(QRE) && marks[i-1] && marks[i+1]) marks[i] = 1;
-                }
-            }
-        } catch(e) {}
-    }
-    let result = '', inMark = false;
-    for (let i = 0; i < escaped.length; i++) {
-        if (marks[i] && !inMark) { result += '<mark>'; inMark = true; }
-        if (!marks[i] && inMark) { result += '</mark>'; inMark = false; }
-        result += escaped[i];
-    }
-    if (inMark) result += '</mark>';
-    return result;
-}
-
-function loadMoreTurns(dir) {
-    const c = window._modalConv;
-    if (dir === 'before') c.startIdx = Math.max(0, c.startIdx - 5);
-    else c.endIdx = Math.min(c.turns.length, c.endIdx + 5);
-    document.getElementById('modal-body').innerHTML = window._renderTurns(c.startIdx, c.endIdx, c.quote);
-}
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
-
-async function downloadFile(url, name) {
-    try {
-        const blob = await (await fetch(url)).blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = name;
-        a.click();
-        URL.revokeObjectURL(a.href);
-    } catch(e) {}
-}
 
 document.getElementById('search-input').addEventListener('input', e => { searchTerm = e.target.value; render(); });
 document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
