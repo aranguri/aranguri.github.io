@@ -64,7 +64,7 @@ mark { background: var(--gold); color: var(--text); font-weight: 600; padding: 1
 .msg-row { display: flex; }
 .msg-row.msg-user { justify-content: flex-start; }
 .msg-row.msg-assistant { justify-content: flex-end; }
-.msg-bubble { padding: 12px 16px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-wrap: break-word; border-radius: 16px; background: var(--card); color: var(--text); }
+.msg-bubble { max-width: 80%; padding: 12px 16px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-wrap: break-word; border-radius: 16px; background: var(--card); color: var(--text); }
 .msg-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; color: var(--text); }
 </style>
 </head>
@@ -295,19 +295,29 @@ async function openModal(quoteIndex) {
     const turns = promptsMap[String(quoteIndex)];
     if (!turns) { alert('No prompt available for this instance.'); return; }
     const modal = document.getElementById('modal');
-    document.getElementById('modal-title').textContent = `${fmtModel(quote.model)} \u2014 ${fmtBench(quote.benchmark)}`;
+    document.getElementById('modal-title').textContent = `${fmtBench(quote.benchmark)} \u2014 ${fmtModel(quote.model)}`;
     document.getElementById('modal-sub').innerHTML = '';
     let displayTurns = turns;
     while (displayTurns.length > 0 && displayTurns[displayTurns.length - 1].role === 'assistant') {
         displayTurns = displayTurns.slice(0, -1);
     }
-    let html = '';
+    const sourceLabel = quote.source === 'response' ? 'Assistant Response' : 'Assistant CoT';
+    let html = '<div style="font-size:12px;font-style:italic;margin-bottom:12px;">Model response omitted — some instances contain sensitive content.</div>';
     for (const t of displayTurns) {
         if (t.role === 'assistant') {
-            html += '<div class="msg-row msg-assistant"><div class="msg-bubble" style="color:var(--text-tertiary);font-style:italic;"><div class="msg-label">Assistant</div>Model response (omitted)</div></div>';
+            html += '<div class="msg-row msg-assistant"><div class="msg-bubble" style="">'
+                + '<div class="msg-label">' + sourceLabel + '</div>'
+                + '... ' + escapeHtml(quote.quote) + ' ...'
+                + '</div></div>';
         } else {
-            html += '<div class="msg-row msg-user"><div class="msg-bubble"><div class="msg-label">User</div>' + escapeHtml(t.content || '') + '</div></div>';
+            html += '<div class="msg-row msg-user"><div class="msg-bubble"><div class="msg-label">Prompt</div>' + escapeHtml(t.content || '') + '</div></div>';
         }
+    }
+    if (displayTurns.length === 1 && displayTurns[0].role === 'user') {
+        html += '<div class="msg-row msg-assistant"><div class="msg-bubble" style="">'
+            + '<div class="msg-label">' + sourceLabel + '</div>'
+            + '... ' + escapeHtml(quote.quote) + ' ...'
+            + '</div></div>';
     }
     document.getElementById('modal-body').innerHTML = html;
     modal.classList.add('open');
