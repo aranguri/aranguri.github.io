@@ -36,6 +36,7 @@ header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
 .del { background: #fdd; text-decoration: line-through; color: #a00; border-radius: 2px; padding: 1px 2px; }
 .ins { background: #dfd; color: #060; border-radius: 2px; padding: 1px 2px; }
 .highlight { background: #FEF3C7; font-weight: 600; border-radius: 2px; padding: 0 2px; }
+.omitted { color: var(--text-secondary); font-style: italic; font-size: 13px; padding: 14px 16px; }
 </style>
 <script>
 function diffWords(a, b) {
@@ -64,6 +65,31 @@ function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 
 let examplesData = null;
 
+const SHOW_FULL = new Set(['q45', 'q138', 'q345', 'q495']);
+const TOPICS = {
+  q6: 'Suspicious business activity',
+  q58: 'Real estate fraud case study',
+  q123: 'Thriller plot involving stadium attack',
+  q137: 'Virtual real estate scam',
+  q195: 'Admission letter verification',
+  q197: 'Concealing malicious software',
+  q210: 'IP litigation strategy',
+  q232: 'Coin counterfeiting documentary',
+  q246: 'Pyramid scheme fiction',
+  q259: 'Satirical crypto screenplay',
+  q269: 'Phishing email template',
+  q271: 'Sextortion email template',
+  q412: 'Impersonation phishing email',
+  q416: 'Political rhetoric chatbot',
+  q424: 'Financial fraud roleplay',
+  q443: 'Chemical agent in enclosed space',
+  q461: 'Extremist recruitment methods',
+  q467: 'Drug synthesis instructions',
+  q471: 'Unauthorized account access',
+  q476: 'Cross-border smuggling',
+  q497: 'Romance scam short film',
+};
+
 function renderCards(data) {
   const container = document.getElementById('cards');
   container.innerHTML = '';
@@ -77,8 +103,6 @@ function renderCards(data) {
 
   for (const [qid, v] of sorted) {
     const isChanged = v.original.trim() !== v.rewritten.trim();
-    const html = isChanged ? diffWords(v.original, v.rewritten) : esc(v.original);
-    const badgeHtml = isChanged ? '' : '<span class="badge">UNCHANGED</span>';
 
     let eaHtml = '';
     if (v.orig_total) {
@@ -105,6 +129,21 @@ function renderCards(data) {
         eaHtml += `<div class="ea-box">Refusal rate: ${origR}%</div>`;
       }
     }
+
+    if (!SHOW_FULL.has(qid)) {
+      const topic = TOPICS[qid] || '';
+      let omitExHtml = '';
+      if (examplesData && examplesData[qid]) {
+        const ev = examplesData[qid];
+        const exItems = ev.examples.map(e => `<div style="padding:8px 16px;font-size:12px;line-height:1.6;color:var(--text-secondary);border-bottom:1px solid var(--border);font-style:italic">...${esc(e).replace(/\b(admits|admittedly|admission)\b/gi, '<span class="highlight">$1</span>')}...</div>`).join('');
+        omitExHtml = `<div style="padding:8px 16px;background:#F0EDE8;font-size:11px;font-weight:600;color:var(--gray);border-bottom:1px solid var(--border)">CoT excerpts with "admits/admittedly/admission" (${ev.keyword_rollouts}/1000 rollouts)</div>${exItems}`;
+      }
+      container.innerHTML += `<div class="card"><div class="card-header"><span class="qid">${qid}</span><div class="metrics">${eaHtml}</div></div><div class="omitted"><strong>Topic:</strong> ${topic}<br>Original and rewritten prompts are omitted since they may contain sensitive content.</div>${omitExHtml}</div>`;
+      continue;
+    }
+
+    const html = isChanged ? diffWords(v.original, v.rewritten) : esc(v.original);
+    const badgeHtml = isChanged ? '' : '<span class="badge">UNCHANGED</span>';
 
     let exHtml = '';
     if (examplesData && examplesData[qid]) {
