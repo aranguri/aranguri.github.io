@@ -102,7 +102,7 @@ function renderCards(data) {
   });
 
   for (const [qid, v] of sorted) {
-    const isChanged = v.original.trim() !== v.rewritten.trim();
+    const isChanged = v.changed != null ? v.changed : v.original.trim() !== v.rewritten.trim();
 
     let eaHtml = '';
     if (v.orig_total) {

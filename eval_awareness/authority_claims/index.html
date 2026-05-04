@@ -39,6 +39,7 @@ header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
 .ins { background: #dfd; color: #060; border-radius: 2px; padding: 1px 2px; }
 .highlight { background: #FEF3C7; font-weight: 600; border-radius: 2px; padding: 0 2px; }
 .results-info { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+.omitted { color: var(--text-secondary); font-style: italic; font-size: 13px; padding: 14px 16px; }
 </style>
 <script>
 function diffWords(a, b) {
@@ -67,6 +68,51 @@ function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 
 let examplesData = null;
 
+const TOPICS = {
+  q7: 'Counter-terrorism evasion strategies',
+  q9: 'Riot escalation tactics',
+  q14: 'Chemical production',
+  q51: 'Cleaning product safety',
+  q52: 'Subway ventilation hazards',
+  q60: 'Fake account detection',
+  q67: 'Gaming account security',
+  q75: 'Pesticide exposure hazards',
+  q79: 'Stalking awareness',
+  q80: 'Human trafficking awareness',
+  q83: 'Urban vulnerability assessment',
+  q161: 'Hazardous powder in mailrooms',
+  q172: 'Transit disruption simulation',
+  q188: 'Informal electricity access',
+  q192: 'Forensic toxicology case study',
+  q215: 'Explosive compound ratios',
+  q221: 'Historical bombing documentation',
+  q235: 'IED phone wiring',
+  q237: 'Military engineering coursework',
+  q251: 'Security vulnerability assessment',
+  q268: 'Covert device in luggage',
+  q285: 'Red-teaming harm scenarios',
+  q321: 'Identity fraud methods',
+  q355: 'Architectural salvage fraud',
+  q356: 'Event food safety vulnerabilities',
+  q358: 'Insurance scam fiction',
+  q364: 'Pickpocketing tactics',
+  q373: 'Hidden surveillance installation',
+  q374: 'Antibiotic resistance in bacteria',
+  q376: 'Kidnapping movie script',
+  q380: 'Prompt injection attack',
+  q387: 'Biosurveillance evasion',
+  q399: 'Extremist recruitment narrative',
+  q400: 'Government cyber vulnerabilities',
+  q406: 'Chemical attack fiction',
+  q407: 'Nuclear device construction',
+  q408: 'Insurgent training camps',
+  q419: 'Maximizing harm scenario',
+  q431: 'Military drone manufacturing',
+  q448: 'Threat assessment case study',
+  q493: 'Fentanyl policy discussion',
+  q494: 'Academic paper review',
+};
+
 function renderCards(data) {
   const container = document.getElementById('cards');
   container.innerHTML = '';
@@ -81,9 +127,7 @@ function renderCards(data) {
 
 
   for (const [qid, v] of sorted) {
-    const isChanged = v.original.trim() !== v.rewritten.trim();
-    const html = isChanged ? diffWords(v.original, v.rewritten) : esc(v.original);
-    const badgeHtml = isChanged ? '' : '<span class="badge">UNCHANGED</span>';
+    const isChanged = v.changed != null ? v.changed : v.original.trim() !== v.rewritten.trim();
 
     let eaHtml = '';
     if (v.orig_tot) {
@@ -118,7 +162,8 @@ function renderCards(data) {
       exHtml = `<div style="padding:8px 16px;background:#F0EDE8;font-size:11px;font-weight:600;color:var(--gray);border-bottom:1px solid var(--border)">CoT excerpts with "chatbot/crowdsource/stranger/unverifiable" (${ev.keyword_rollouts}/1000 rollouts)</div>${exItems}`;
     }
 
-    container.innerHTML += `<div class="card"><div class="card-header"><span class="qid">${qid}</span>${badgeHtml}<div class="metrics">${eaHtml}</div></div><div class="diff-body">${html}</div>${exHtml}</div>`;
+    const topic = TOPICS[qid] || '';
+    container.innerHTML += `<div class="card"><div class="card-header"><span class="qid">${qid}</span><div class="metrics">${eaHtml}</div></div><div class="omitted"><strong>Topic:</strong> ${topic}<br>Original and rewritten prompts are omitted since they may contain sensitive content.</div>${exHtml}</div>`;
   }
 }
 
